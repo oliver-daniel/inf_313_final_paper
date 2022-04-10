@@ -1,0 +1,191 @@
+---
+title: "W(ha/il)t's the (wo/ba)rd?" # TODO
+subtitle: "A cross-sectional analysis of English word pairs that satisfy the properties of the Split Decisions word puzzle"
+author: "Oliver Daniel"
+abstract: >
+  From three English wordlist corpora, pairs of words are generated which might appear in the Split Decisions word puzzle as published by the New York Times, i.e., at least 5 characters in length and differing by exactly two consecutive characters. The corpora are contrasted among themselves, and then the lexical and phonological properties of those words which form pairs – and those which do not – are analyzed for causative insights. Such insights will be alluded to here once discovered.
+  
+date: "April 6, 2022"
+output:
+  bookdown::pdf_document2:
+    toc: true
+    number_sections: false
+knit: (function(input, ...) {
+    rmarkdown::render(
+    input,
+    output_file = "out/paper_5.pdf",
+    envir = globalenv(),
+    ...
+    )
+  })
+bibliography: in/references.bib
+link-citations: true
+---
+\\par \\textbf{Keywords}: crosswords, split decisions, computational linguistics
+
+Code available on [GitHub (link)](https://github.com/oliver-daniel/inf_313_final_paper).
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(
+    echo = FALSE, warning = FALSE,
+    out.width = "100%", out.align = "center", dir
+)
+options(knitr.graphics.error = FALSE)
+```
+
+```{r libraries, include=FALSE}
+if (!require(tidyverse)) {
+    install.packages("tidyverse")
+}
+if (!require(kableExtra)) {
+    install.packages("kableExtra")
+}
+
+library(tidyverse)
+library(knitr) # TODO CITE
+library(kableExtra) # TODO CITE
+```
+
+## Introduction
+A few times a year, the New York Times games department releases a new issue of Split Decisions, a crossword-like word puzzle. Similar to crosswords, the game board consists of boxes arranged in sequence, one for each letter of a word running either left-to-right or top-to-bottom, intersecting with other words at right angles. However, instead of cryptic descriptions of correct answers, Split Decisions solvers are only given pairs of two-letter substrings for each word, either of which serves to complete a valid English word. For example, given the following diagram:
+
+<!-- TODO: visual example -->
+$${PL \choose GR} \_\ \_\ \_\ \_$$
+
+A correct fill for the remaining boxes might be __EASE, creating both PLEASE and GREASE. For the remainder of this paper, such a pair of words will be referred to as a *split pair*. Conversely, an incorrect fill might be __IERS, which produces the valid word PLIERS and the invalid word \*GRIERS[^1]. Note that each combination of clues (hereon a *split*) might accept several different fills for the common substring, e.g., __UNGE (PLUNGE, GRUNGE); however, as with crosswords, only one solution will also satisfy all the crossing constraints produced by the rest of the puzzle. 
+
+Note that, although a letter may appear on both sides of a split, say, (IT/TA), the letter will *never* appear at the same index in both words, e.g., (IT/AT), as such a pair of words would only differ by a single letter instead of two. Also, although such a puzzle would be fascinating to both solve and analyze, crossing words do *not* go through split pairs, only common letters.
+
+Upon understanding the rules of the puzzle, one may start to wonder: what sorts of words form split pairs? Are some splits more common than others? How do the properties of English, as both a spoken and written language, affect the guessability of a given split pair? In this paper, we perform preliminary statistical analysis to investigate these questions, using a variety of computational methods.
+
+
+## Data
+I used [@R], [@tidyverse], and [@ggplot2].
+The wordlists come from GNU/Linux (specifically `/usr/share/dict/words` on an Ubuntu distribution), [@collins], and [@nwl2020].
+
+```{r read-data}
+corpus.linux <- read.table("in/corpus/linux.txt")
+corpus.collins <- read.table("in/corpus/collins.txt")
+corpus.nwl <- read.table("in/corpus/NWL2020.txt")
+
+dat.linux <-
+    read.csv("in/cache/linux.csv") |>
+    tibble() |>
+    mutate(
+        corpus = "linux",
+    )
+
+dat.collins <-
+    read.csv("in/cache/collins.csv") |>
+    tibble() |>
+    mutate(
+        corpus = "collins",
+        start = start + 1, # Made this column zero-indexed by accident :)
+        end = end + 1
+    )
+
+dat.nwl <-
+    read.csv("in/cache/NWL2020.csv") |>
+    tibble() |>
+    mutate(corpus = "nwl")
+
+dat.all <- function() {
+    rbind(
+        dat.linux,
+        dat.collins,
+        dat.nwl
+    )
+}
+```
+
+```{r}
+most_common <- function(col, n = 1) {
+    table(col) |>
+        sort() |>
+        names() |>
+        tail(n)
+}
+
+PATTERN <- "[a-z]{5,}"
+
+corpus_stats <- rbind(
+    tibble(
+        corpus = "linux",
+        all_words = corpus.linux |> nrow(),
+        valid_words = corpus.linux |>
+            filter(str_detect(V1, PATTERN)) |>
+            nrow(),
+        pairs_count = dat.linux |> nrow()
+    ),
+    tibble(
+        corpus = "collins",
+        all_words = corpus.collins |> nrow(),
+        valid_words = corpus.collins |>
+            filter(str_detect(V1, PATTERN)) |>
+            nrow(),
+        pairs_count = dat.collins |> nrow()
+    ),
+    tibble(
+        corpus = "nwl",
+        all_words = corpus.nwl |> nrow(),
+        valid_words = corpus.nwl |>
+            filter(str_detect(V1, PATTERN)) |>
+            nrow(),
+        pairs_count = dat.nwl |> nrow()
+    )
+)
+
+split_pair_counts <- dat.all() |>
+    mutate(split_pair = paste0(split_x, "/", split_y)) |>
+    group_by(corpus) |>
+    count(split_pair, name = "split_pair_count") |>
+    slice_max(n = 1, order_by = split_pair_count, with_ties = F)
+
+
+split_x_counts <- dat.all() |>
+    group_by(corpus) |>
+    count(split_x, name = "split_x_count") |>
+    slice_max(n = 1, order_by = split_x_count, with_ties = F)
+
+split_y_counts <- dat.all() |>
+    group_by(corpus) |>
+    count(split_y, name = "split_y_count") |>
+    slice_max(n = 1, order_by = split_y_count, with_ties = F)
+```
+
+```{r}
+corpus_stats |>
+    left_join(split_x_counts, by = "corpus") |>
+    left_join(split_y_counts, by = "corpus") |>
+    left_join(split_pair_counts, by = "corpus") |>
+    mutate(
+        split_x = paste0(split_x, " (", split_x_count, ")"),
+        split_y = paste0(split_y, " (", split_y_count, ")"),
+        split_pair = paste0(split_pair, " (", split_pair_count, ")")
+    ) |>
+    select(corpus, all_words, valid_words, pairs_count, split_x, split_y, split_pair) |>
+    kable(
+        booktabs = TRUE,
+        col.names = c("Corpus", "Total",
+            "Valid", "Total", "First split",
+            "Second split", "Split pair")
+    ) |>
+    kable_classic() |>
+    add_header_above(c(" " = 1, "Words" = 2, "Pairs" = 1, "Most frequent (occurrences)" = 3))
+```
+
+## Results
+
+## Discussion
+
+\newpage
+## Appendix
+<!-- TODO: python script -->
+
+\newpage
+## References
+
+
+
+
+<!-- Footnotes -->
+[^1]: The asterisk prefix will be used throughout this paper to indicate incorrect/invalid words.

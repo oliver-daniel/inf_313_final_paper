@@ -1,0 +1,7 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.log
+**/*.DS_STORE
+in/cache/corpus_splits.csv

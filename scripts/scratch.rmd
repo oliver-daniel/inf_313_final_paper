@@ -1,0 +1,93 @@
+```{r}
+library(tidyverse)
+library(stringdist)
+```
+
+
+```{r}
+PATTERN <- "^[a-z]{5,}$"
+
+readWordlist <- function(filename) {
+  lns <- read.table(filename, fileEncoding = "utf8")
+  lns |>
+    filter(str_detect(V1, PATTERN)) |>
+    pull("V1")
+}
+
+getWordPairs <- function(wordlist) {
+  result <- list()
+  for (a_ in wordlist) {
+    for (b_ in wordlist) {
+      a <- str_split(a_, "")[[1]] # WHY!?
+      b <- str_split(b_, "")[[1]]
+
+      if (identical(a, b) | length(a) != length(b)) {
+        next
+      }
+      differences <- map_int(seq_along(a), ~
+      if_else(a[[.]] != b[[.]], ., as.integer(NA)))
+      differences <- differences[!is.na(differences)]
+      # print(differences)
+      if (length(differences) == 2 & differences[1] + 1 == differences[2]) {
+        result[length(result) + 1] <- tibble(c(a = paste0(a, collapse = ""), b = paste0(b, collapse = ""), start = differences[1], end = differences[2]))
+      }
+    }
+  }
+  bind_rows(result)
+}
+```
+
+```{r}
+x <- readWordlist("in/linux.txt")
+x |>
+  getWordPairs() |>
+  slice_sample(n = 50)
+```
+
+```{r}
+# wordlist <- readWordlist('in/linux.txt') |> head(Inf)
+
+getWordPairs <- function(wordlist) {
+  result <- list()
+  k <- length(wordlist)
+  for (i in seq(1, k - 1)) {
+    for (j in seq(i + 1, k)) {
+      x <- wordlist[i]
+      y <- wordlist[j]
+
+      if (str_length(x) != str_length(y)) {
+        next
+      }
+      N <- str_length(x)
+
+      differences <- map_int(1:N, ~
+      if_else(substr(x, ., .) != substr(y, ., .),
+        .,
+        as.integer(NA)
+      )) |> discard(is.na)
+
+
+      if (length(differences) == 2 & differences[1] + 1 == differences[2]) {
+        start <- differences[1]
+        end <- differences[2]
+
+        result[length(result) + 1] <- tibble(c(
+          length = N,
+          x = x,
+          y = y,
+          start = start,
+          end = end,
+          split_x = substr(x, start, end),
+          split_y = substr(y, start, end)
+        ))
+      }
+    }
+  }
+  bind_rows(result)
+}
+
+lst <- readWordlist("in/linux.txt") |> head(500)
+pairs <- getWordPairs(lst)
+pairs
+```
+

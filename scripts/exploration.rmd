@@ -1,0 +1,162 @@
+```{r}
+library(tidyverse)
+library(stringdist)
+```
+
+```{r}
+dat.linux <-
+  read.csv("in/cache/linux.csv") |>
+  tibble() |>
+  add_column(corpus = "linux")
+
+dat.collins <-
+  read.csv("in/cache/collins.csv") |>
+  tibble() |>
+  add_column(corpus = "collins") |>
+  mutate(
+    start = start + 1, # Made this column zero-indexed by accident :)
+    end = end + 1
+  )
+
+dat.nwl <-
+  read.csv("in/cache/NWL2020.csv") |>
+  tibble() |>
+  add_column(corpus = "nwl")
+# Defer binding + memory allocation until last possible second --
+# no clue if that actually does anything
+dat.all <- function() {
+  rbind(
+    dat.linux,
+    dat.collins,
+    dat.nwl
+  )
+}
+```
+
+```{r}
+dat.all() |>
+  # slice_sample(prop = 1) |>
+  # group_by(corpus) |>
+  # add_count(length) |>
+  ggplot(aes(x = length, fill = corpus)) +
+  geom_bar() +
+  scale_x_continuous(breaks = 5:21) +
+  scale_y_continuous(trans = "log10") +
+  theme(panel.grid.minor.x = element_blank())
+```
+
+```{r}
+# most common pairings, in original
+# lexical order
+dat.all() |>
+  filter(end == length) |>
+  select(x, y, split_x, split_y, length, end) |>
+  count(split_x, split_y) |>
+  arrange(desc(n))
+```
+
+```{r}
+suffixes <- dat.all() |>
+  filter(end == length)
+
+suffix_counts <- c(
+  suffixes$split_x,
+  suffixes$split_y
+) |>
+  table() |>
+  data.frame() |>
+  tibble() |>
+  arrange(desc(Freq)) |>
+  rowid_to_column(var = "rank")
+
+## Interesting:
+# the top 6 suffixes are all
+# declensions: es, ed, er, (i)ng, (i)on, ly
+suffix_counts |>
+  ggplot(aes(x = log10(rank), y = log10(Freq))) +
+  geom_point() +
+  scale_x_continuous(limits = c(0, 5)) +
+  scale_y_continuous(limits = c(0, 5)) +
+  coord_fixed()
+```
+
+```{r}
+# let's take a look at that more generally
+
+splits_by_type <- dat.all() |>
+  mutate(
+    type = case_when(
+      start == 1 ~ "prefix",
+      end == length ~ "suffix",
+      TRUE ~ "middle"
+    )
+  )
+
+rbind(
+  splits_by_type |> select(split = split_x, type),
+  splits_by_type |> select(split = split_y, type)
+) |>
+  count(split, type) |>
+  group_by(type) |>
+  mutate(
+    rank = rank(-n, ties.method = "first"),
+    f = max(n) / rank
+  ) |>
+  ggplot(aes(x = rank, y = n, color = type, )) +
+  geom_point() +
+  geom_line(aes(x = rank, y = f), linetype = 2) +
+  # geom_smooth(method = "lm", se = F, alpha = .5) +
+  scale_x_continuous(limits = c(1, 26^2)) +
+  scale_y_log10() #+
+```
+
+```{r}
+# what about /all/ splits?
+
+if (!file.exists("in/cache/corpus_splits.csv")) {
+  read.table("in/corpus/linux.txt") |>
+    tibble() |>
+    mutate(corpus = "linux") |>
+    rbind(
+      read.table("in/corpus/collins.txt") |>
+        tibble() |>
+        mutate(corpus = "collins")
+    ) |>
+    rbind(
+      read.table("in/corpus/NWL2020.txt") |>
+        tibble() |>
+        mutate(corpus = "nwl")
+    ) |>
+    filter(str_detect(V1, "^[a-z]{5,}$")) |>
+    # slice_sample(prop = .2) |>
+    rowwise() |>
+    mutate(
+      splits = map(
+        seq(1, str_length(V1) - 1), ~ paste0(
+          substr(V1, ., .),
+          substr(V1, . + 1, . + 1)
+        )
+      ) |> paste0(collapse = ",")
+    ) |>
+    separate_rows(splits, sep = ",") |>
+    write.csv("in/cache/corpus_splits.csv")
+}
+
+# Of the 26^2 = 676 possible combinations,
+# 614 are accounted for
+corpus_splits <- read.csv("in/cache/corpus_splits.csv")
+
+corpus_splits |>
+  count(corpus, splits) |>
+  group_by(corpus) |>
+  mutate(
+    rank = rank(-n, ties.method = "first"),
+    f = max(n) / rank
+  ) |>
+  ggplot(aes(x = rank, y = n, color = corpus)) +
+  geom_point() +
+  geom_line(aes(y = f), linetype = 2) +
+  geom_vline(aes(xintercept = 425), linetype = 3) +
+  scale_x_continuous(limits = c(1, 26^2)) +
+  scale_y_log10()
+```
