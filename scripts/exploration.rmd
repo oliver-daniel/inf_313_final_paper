@@ -160,3 +160,130 @@ corpus_splits |>
   scale_x_continuous(limits = c(1, 26^2)) +
   scale_y_log10()
 ```
+
+```{r}
+# TODO: better gridline color
+corpus_splits |>
+  ggplot(aes(
+    x = substr(splits, 1, 1),
+    y = substr(splits, 2, 2)
+  )) +
+  geom_bin2d() +
+  geom_bin2d(data = transform(corpus_splits, corpus = "total")) +
+  coord_fixed() +
+  scale_fill_continuous(type = "viridis") +
+  facet_wrap(~corpus, ncol = 2)
+```
+
+```{r}
+dat.all() |>
+  filter(length <= 15) |>
+  ggplot(aes(
+    x = factor(length),
+    y = start,
+    color = corpus
+  )) +
+  geom_violin(scale = "width") +
+  facet_wrap(~corpus, dir = "v") +
+  scale_y_continuous(breaks = c(2, 4, 6, 8, 10, 12, 14, 16)) +
+  theme(
+    legend.position = "none"
+  )
+```
+
+```{r}
+# Interested in different combinations of "templates" --
+# how many length + split + posn combos are there?
+templates <- splits_by_type |>
+  distinct(x, y, .keep_all = T) |>
+  add_count(length, split_x, split_y, start, type)
+
+templates |>
+  group_by(split_x, split_y, type) |>
+  arrange(desc(n)) |>
+  View()
+```
+
+```{r}
+# Similarly, what about coming into and out of splits?
+
+splits_by_type |>
+  filter(type == "prefix") |>
+  mutate(common_first = substr(x, end + 1, end + 1)) |>
+  count(common_first, split_x, split_y) |>
+  arrange(desc(n))
+# shows coarticulation in action!!! "im" for p, in/un for t/s...
+
+splits_by_type |>
+  filter(type == "suffix") |>
+  mutate(common_last = substr(x, start - 1, start - 1)) |>
+  count(common_last, split_x, split_y) |>
+  arrange(desc(n))
+# lots of i + declension... what else?
+
+splits_by_type |>
+  filter(type == "suffix") |>
+  mutate(common_last = substr(x, start - 1, start - 1)) |>
+  filter(common_last != "i") |>
+  count(common_last, split_x, split_y) |>
+  arrange(desc(n))
+# t, s, a, e, n here with other kinds of declension
+# (ed + or, nt + te)... if I were in the mood, I'd
+# look for etymology too (maybe these are Latinate stems?)
+```
+
+```{r}
+# vowels going into vowels
+splits_by_type |>
+  mutate(common_last = substr(x, start - 1, start - 1)) |>
+  filter(str_detect(split_x, "^[aeiou]") | str_detect(split_y, "^[aeiou]")) |>
+  filter(common_last %in% c("a", "e", "i", "o", "u")) |>
+  count(common_last, split_x, split_y, type) |>
+  arrange(desc(n)) #|> View()
+  # once scrolling past the domination of i, some interesting effects,
+  # esp with vowels that can double (oo, ee) -- Great Vowel Shift spellings?
+
+  splits_by_type |>
+  filter(substr(x, start - 1, start - 1) == "o" &
+        (substr(split_x, 1, 1) == "o" |
+         substr(split_y, 1, 1) == "o"))# |> View()
+  # as expected, many splits with "o_" have /u/ represented by the <oo>, but
+  # some are even tricker due to other consonant interactions (floor/flown)
+
+  splits_by_type |>
+  mutate(
+    common_last = substr(x, start - 1, start - 1),
+    split_x_first = substr(split_x, 1, 1),
+    split_y_first = substr(split_y, 1, 1)
+  ) |>
+  filter(common_last %in% c("o", "e") &
+        (common_last == split_x_first | common_last == split_y_first)) |>
+  filter(!if_else(
+    common_last == split_x_first,
+    split_y_first,
+    split_x_first
+  ) %in% c("a", "e", "i", "o", "u")) |> View()
+
+  # Also introducing some neat schwa/lenition effects:
+  # "belay/beefy", etc.
+  # time to generalize this
+```
+
+```{r}
+# get all rows where the:
+# a) last letters of the common, and
+# b) first letter of either split
+# are those specified.
+withLeftBoundary <- function(data, last_common_letters, first_split_letters) {
+  data |>
+  mutate(
+    common_last = substr(x, start - 1, start - 1),
+    split_x_first = substr(split_x, 1, 1),
+    split_y_first = substr(split_y, 1, 1)
+  ) |>
+  rowwise() |>
+  filter(common_last %in% last_common_letters &
+         length(intersect(c(split_x_first, split_y_first),
+         first_split_letters)) > 0)
+}
+```
