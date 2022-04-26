@@ -5,3 +5,5 @@
 *.log
 **/*.DS_STORE
 in/cache/corpus_splits.csv
+out/paper_5_files/
+paper_5_cache/

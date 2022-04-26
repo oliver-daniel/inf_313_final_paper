@@ -26,3 +26,4 @@ This repository contains the full source for the final paper of INF 312 (Winter 
 
 ### `out/`
 - `paper_5.pdf`: The most recently-generated PDF edition of the final paper, including all text, tables, graphs, and cross-references. 
+- `res/`: All other resources, mainly images, needed to create the paper.
