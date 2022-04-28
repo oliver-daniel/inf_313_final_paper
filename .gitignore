@@ -4,6 +4,6 @@
 .Ruserdata
 *.log
 **/*.DS_STORE
-in/cache/corpus_splits.csv
+in/cache/corpus_2grams.csv
 out/paper_5_files/
 paper_5_cache/

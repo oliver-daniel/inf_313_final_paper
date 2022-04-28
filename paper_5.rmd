@@ -54,9 +54,7 @@ library(kableExtra) # TODO CITE
 <!-- TODO: "in this paper..." -->
 ### About Split Decisions
 A few times a year, the New York Times games department releases a new issue of a word puzzle called Split Decisions. Similar to crosswords, the game board consists of boxes arranged in sequence, one for each letter of a word running either left-to-right or top-to-bottom, intersecting with other words at right angles, as shown below in Figure \ref{fig:example-puzzle}. The Split Decisions website [@split-decisions] attributes the original puzzle format to the late George Bredehorn; after his death, the mantle was taken up by Fred Piscop, whose puzzles appear in the *Times* to this day.
-
-<!-- ![](http://split-decisions.us/sd001-g.GIF) -->
-```{r example-puzzle, fig.cap="\\label{fig:example-puzzle}An example Split Decisions puzzle from Piscop's website."}
+```{r example-puzzle, out.width="60%", fig.cap="\\label{fig:example-puzzle}An example Split Decisions puzzle from Piscop's website."}
 knitr::include_graphics("out/res/example-puzzle.png")
 ```
 
@@ -92,6 +90,7 @@ The `collins` corpus [@collins] is privately produced by HarperCollins LLC, a pu
 
 Similarly, the `nwl` corpus [@nwl2020] was produced directly by members of the North American Scrabble Association (NASPA) for the purpose of tournament play. In Canada and the United States, this word list serves as the *de facto* standard for competitive Scrabble, and is usually the default wordlist unless another is specified, as in the aforementioned Collins divisions.
 
+From each of these corpora, only those entries consisting solely of five or more Latin characters without diacritics were accepted for further processing.
 ```{r read-data}
 corpus.linux <- read.table("in/corpus/linux.txt")
 corpus.collins <- read.table("in/corpus/collins.txt")
@@ -182,7 +181,7 @@ split_y_counts <- dat.all() |>
     slice_max(n = 1, order_by = split_y_count, with_ties = F)
 ```
 
-```{r corpus-stats"}
+```{r corpus-stats}
 corpus_stats |>
     left_join(split_x_counts, by = "corpus") |>
     left_join(split_y_counts, by = "corpus") |>
@@ -217,7 +216,9 @@ The algorithm for determining whether two strings of the same length form a Spli
 2. Record each index at which the two characters differ.
 3. Once traversal is complete, if there are exactly two differences and they differ in index by exactly one, then the two strings form a word pair. Otherwise, continue with another combination of strings.
 
-However, initial experiments with identifying these word pairs directly in R proved to be untenably slow. Since every word in a corpus has to be compared to every other word of the same length at least once, any algorithm[^2] used to do so cannot run in better than quadratic time, and even R packages with bindings to C took several hours to run on even the smallest of the corpora. Instead, a Python script was written to process the words more efficiently, and then write the results in a CSV file that could be more readily imported into the R environment. This precomputation phase significantly reduced start-up time when creating R sessions to author this paper, or to knit this document into a PDF. A link to the script can be found in the Appendix.
+However, initial experiments with identifying these word pairs directly in R [@R] proved to be untenably slow. Since every word in a corpus has to be compared to every other word of the same length at least once, any algorithm[^2] used to do so cannot run in better than quadratic time, and even R packages with bindings to C took several hours to run on even the smallest of the corpora. Instead, a Python script was written to process the words more efficiently, and then write the results in a CSV file that could be more readily imported into the R environment. This precomputation phase significantly reduced start-up time when creating R sessions to author this paper, or to knit this document into a PDF using `knitr` [@knitr]. A link to this script can be found in the Appendix.
+
+Apart from these, the remainder of data processing from this paper was performed in R using the popular `tidyverse` package collection [@tidyverse], and visualized using the indispensible `ggplot2` [@ggplot2].
 
 ### Variables
 These cached CSVs accounted for the following variables of each word pair:
@@ -259,17 +260,211 @@ dat.all() |>
     )
 ```
 
-As discussed later in **Results**, we hypothesize that the gobelet-like shape seen above in longer words (e.g., 9+ letters) is due to a wide variety of verbal stems that differ only in their declension, as indicated by a suffix (e.g., participating, participation).
+As discussed later in **Results**, we hypothesize that the goblet-like shape seen predominantly in longer words (i.e,., 9+ letters) is due to a widened variety of verbal stems that differ only in their declension, as indicated by a suffix (e.g., participating, participation).
+
+Looking at all consecutive pairings of letters (*2-grams*) in each corpus, we see that 614 out of a possible $26^2 = 676$ pairings are accounted for at least once. Figure \ref{fig:bigram-heatmap} below depicts the relative frequency of these pairings, with the white squares representing those pairs that appear nowhere in the corpus (or corpora). Some more infrequent first letters, such as *q* or *z*, demonstrate large streaks of unattested pairs. This is in line with certain orthotactic[^3] constraints present in the English language and will be discussed in greater detail in **Discussion**.
+
+```{r bigram-heatmap, fig.cap="\\label{fig:bigram-heatmap}Distributions appear relatively consistent across corpora, except for particularly esoteric combinations: the Linux corpus contains no q's followed by anything other than a u."}
+corpus_2grams <- read.csv("in/cache/corpus_2grams.csv")
+corpus_2grams |>
+  ggplot(aes(
+    y = substr(splits, 1, 1),
+    x = substr(splits, 2, 2),
+    fill = after_stat(count / max(count))
+  )) +
+  geom_bin2d() +
+  geom_bin2d(data = transform(corpus_2grams, corpus = "total")) +
+  coord_fixed() +
+  scale_fill_continuous(type = "viridis") +
+  facet_wrap(~corpus, ncol = 2) +
+  labs(
+      title = str_wrap("Proportional frequency of 2-grams across all words", 60),
+      y = "First letter",
+      x = "Second letter",
+      fill = "Proportional frequency"
+  ) +
+  theme()
+```
 
 ## Results
+Upon encountering such a wide distribution of categorical data (i.e., ordered strings of characters), our first thought was to see if some aspect of the distribution obeyed Zipf's Law [@zipf]. In brief, this empirical law states that when observations in a categorical set are ranked by frequency, the second-ranked observation occurs roughly half as often as the first, the third-ranked a third as often, and so on. In mathematical terms, over a frequency-ordered distribution $X$ with ranking variable $i$,
+
+$$\text{Zipf}(X) \iff X_i \approx \frac{X_1}{i}.$$
+
+```{r letter_distributions}
+make_letter_dist <- function(corpus) {
+  read.table(paste0("in/corpus/", corpus, ".txt")) |>
+    tibble() |>
+    filter(str_detect(V1, "^[a-z]{5,}$")) |>
+    pluck("V1") |>
+    str_split("") |>
+    unlist() |>
+    table() |>
+    bind_rows() |>
+    pivot_longer(cols = 1:26) |>
+    mutate(value = as.numeric(value))
+}
+
+letter_dists <- make_letter_dist("linux") |>
+  mutate(corpus = "linux") |>
+  rbind(make_letter_dist("collins") |>
+    mutate(corpus = "collins")) |>
+  rbind(make_letter_dist("NWL2020") |>
+    mutate(corpus = "nwl"))
+
+letter_rankings <- letter_dists |>
+  pivot_wider(names_from = corpus) |>
+  mutate(total = rowSums(across(2:4))) |>
+  arrange(desc(total))
+```
+
+Before examining the splits and other puzzle-specific properties of words, we examined the distribution of one- and two-letter sequences to see if any Zipf-like patterns emerged. Surprisingly, however, the data outperformed Zipf's Law (i.e., contained many more observations than the power law predicts) in these categories. Figure \ref{fig:single-letter-distribution} below, which examines the total occurrences of single letters in all valid words, exemplifies this. The black dashed curve represents the expected count of each letter according to Zipf's Law, whereas the total height of each bar represents the actual count. The second-most common letter, *s*, is expected to occur $539,056 / 2 = 269,528$ times, or 50% of the total occurrences of *e*; it instead appears roughly 84% as often, a total of `r letter_rankings$total[[2]]` times. This disparity between Zipfian expectation and reality only increases in higher ranks, save for the universally rare *q* and *j*.
+
+```{r single-letter-distribution, fig.cap="\\label{fig:single-letter-distribution}The total distribution of letters across all valid corpus words is consistently greater than the ideal Zipf curve (black) would predict."}
+
+
+letter_dists |>
+  rowwise() |>
+  mutate(
+    rank = match(name, letter_rankings$name),
+    f = letter_rankings[["total"]][[rank]] / rank
+  ) |>
+  ggplot(aes(x = reorder(name, rank), y = value, fill = corpus)) +
+  geom_bar(stat = "identity") +
+  geom_line(aes(x = rank, y = f), linetype = 2) +
+  labs(
+      title = str_wrap("Distribution of letters in corpus words: Zipf's Law vs. observations", 60),
+      x = "Letter",
+      y = "Occurrences"
+  ) +
+  theme()
+```
+
+Looking at each corpus individually, we can also examine their 2-grams; that is, each consecutive pair of characters that occurs in every valid word. As an example, the word "aardvark" contains the 2-grams "aa", "ar", "rd", "dv", "va", "ar", and "rk". (Note that "ar" occurs twice, and is counted as such.) Figure \ref{fig:two-letter-distribution} below again pits the frequency of these 2-grams against the expectation of Zipf's Law, yielding an interesting result. For clarity and visual interest, some of these 2-grams have been included beside their place on the graph, serving as waypoints of increasingly uncommon letter pairings.
+
+```{r two-letter-distribution, fig.cap="\\label{fig:two-letter-distribution}Looking at all 2-grams across the three corpora, distributions of all but the bottom ~190 attested instances outperform a Zipf curve."}
+
+corpus_2grams <- read.csv("in/cache/corpus_2grams.csv")
+
+labelled_points <- c(1, 3, 10, 100, 200, 300, 400, 500, 600, 616)
+corpus_2grams |>
+  count(corpus, splits) |>
+  group_by(corpus) |>
+  mutate(
+    rank = rank(-n, ties.method = "first"),
+    f = max(n) / rank,
+    label = ifelse(rank %in% labelled_points, splits, NA)
+  ) |>
+  ggplot(aes(x = rank, y = n, color = corpus, label = label)) +
+  geom_point() +
+  geom_line(aes(y = f), linetype = 2) +
+  geom_vline(aes(xintercept = 420), linetype = 3) +
+  geom_text(hjust = -1.5, vjust = .5) +
+  scale_x_continuous(limits = c(1, 26^2), breaks=c(1, 100, 200, 300, 400, 500, 616)) +
+  scale_y_log10() +
+  labs(
+      title = str_wrap("Distribution of 2-grams in corpus words: Zipf's Law vs. observations", 60),
+      x = "Rank of 2-gram by frequency",
+      y = "Occurrences (log-scale)"
+  ) +
+  theme()
+```
+
+
+
+```{r split-letters-heatmap, fig.cap="\\label{fig:split-letters-heatmap}Split pairs are predominated by a few major players: es, ng, re, st, etc."}
+all_split_pairs <- dat.all() |>
+  select(split = split_x, corpus) |>
+  rbind(dat.all() |> select(split = split_y, corpus))
+
+all_split_pairs |>
+  ggplot(aes(
+    x = substr(split, 2, 2),
+    y = substr(split, 1, 1),
+    fill = after_stat(count) / max(count)
+  )) +
+  geom_bin2d() +
+  geom_bin2d(data = transform(all_split_pairs, corpus = "total")) +
+  coord_fixed() +
+  scale_y_discrete(limits = rev(letters)) +
+  scale_fill_continuous(type = "viridis") +
+  facet_wrap(~corpus, ncol = 2) +
+  labs(
+      title = str_wrap("Proportional frequency of split 2-grams", 60),
+      y = "First letter",
+      x = "Second letter",
+      fill = "Proportional frequency"
+  ) +
+  theme()
+```
+
+```{r top-splits-by-position}
+splits_by_type <- dat.all() |>
+  mutate(
+    type = case_when(
+      start == 1 ~ "prefix",
+      end == length ~ "suffix",
+      TRUE ~ "middle"
+    )
+  )
+
+rbind(
+  splits_by_type |> select(split = split_x, type),
+  splits_by_type |> select(split = split_y, type)
+) |>
+  count(split, type, sort = T) |>
+  group_by(type) |>
+  do(head(., 5)) |>
+  mutate(str_rep = paste0(split, " (", n, ")"), id = row_number()) |>
+  pivot_wider(names_from = type, values_from = str_rep) |>
+  group_by(id) |>
+  summarise_all(~ na.omit(.)[1]) |>
+  select(id, prefix, middle, suffix) |>
+  kable(booktabs = F, col.names = c(
+      "Rank", "prefix", "middle", "suffix"
+  ), caption = "Most common splits by word position.") |>
+  kable_classic(latex_options = "hold_position")
+```
+
+```{r split-position-distribution, }
+
+rbind(
+  splits_by_type |> select(split = split_x, type),
+  splits_by_type |> select(split = split_y, type)
+) |>
+  count(split, type) |>
+  group_by(type) |>
+  mutate(
+    rank = rank(-n, ties.method = "first"),
+    f = max(n) / rank,
+    label = ifelse(rank %in% labelled_points, split, NA)
+  ) |>
+  ggplot(aes(x = rank, y = n, color = type, label = label)) +
+  geom_point() +
+  geom_line(aes(x = rank, y = f), linetype = 2) +
+  geom_text(vjust = -1.5, hjust = .5, size = 3) +
+  # geom_smooth(method = "lm", se = F, alpha = .5) +
+  scale_x_continuous(limits = c(1, 26^2)) +
+  scale_y_log10() +
+  labs(
+      title = str_wrap("Distribution of splits by word position", 60),
+      y = "Occurrences (log-scale)",
+      x = "Frequency rank"
+  )
+```
 
 ## Discussion
+### Orthotactics
+
+### Phonotactics
+
+### 
 
 \newpage
 ## Appendix
 <!-- TODO: python script -->
 ### Link to Python preprocessing script
-Found in the [GitHub repo](https://github.com/oliver-daniel/inf_313_final_paper/blob/main/scripts/find_pairs.py).
+Found in the [GitHub repo (link)](https://github.com/oliver-daniel/inf_313_final_paper/blob/main/scripts/find_pairs.py).
 
 \newpage
 ## References
@@ -280,3 +475,4 @@ Found in the [GitHub repo](https://github.com/oliver-daniel/inf_313_final_paper/
 <!-- Footnotes -->
 [^1]: Or *fill*: this part of the puzzle is filled in by the player rather than the constructor.
 [^2]: i.e., any naive iterative algorithm.
+[^3]: Pertaining to the rules and constraints of spelling. E.g., "pwn" violates English orthotactic rules, and thus could never constitute a non-abbreviated English word.

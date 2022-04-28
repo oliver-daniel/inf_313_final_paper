@@ -111,6 +111,44 @@ rbind(
 ```
 
 ```{r}
+
+make_letter_dist <- function(corpus) {
+  read.table(paste0("in/corpus/", corpus, ".txt")) |>
+    tibble() |>
+    filter(str_detect(V1, "^[a-z]{5,}$")) |>
+    pluck("V1") |>
+    str_split("") |>
+    unlist() |>
+    table() |>
+    bind_rows() |>
+    pivot_longer(cols = 1:26) |>
+    mutate(value = as.numeric(value))
+}
+
+letter_dists <- make_letter_dist("linux") |>
+  mutate(corpus = "linux") |>
+  rbind(make_letter_dist("collins") |>
+    mutate(corpus = "collins")) |>
+  rbind(make_letter_dist("NWL2020") |>
+    mutate(corpus = "nwl"))
+
+letter_rankings <- letter_dists |>
+  pivot_wider(names_from = corpus) |>
+  mutate(total = rowSums(across(2:4))) |>
+  arrange(desc(total))
+
+letter_dists |>
+  rowwise() |>
+  mutate(
+    rank = match(name, letter_rankings$name),
+    f = letter_rankings[["total"]][[rank]] / rank
+  ) |>
+  ggplot(aes(x = reorder(name, rank), y = value, fill = corpus)) +
+  geom_bar(stat = "identity") +
+  geom_line(aes(x = rank, y = f))
+```
+
+```{r}
 # what about /all/ splits?
 
 if (!file.exists("in/cache/corpus_splits.csv")) {
@@ -173,6 +211,91 @@ corpus_splits |>
   coord_fixed() +
   scale_fill_continuous(type = "viridis") +
   facet_wrap(~corpus, ncol = 2)
+```
+
+```{r}
+# Similar to above, but for split pairs
+all_split_pairs <- dat.all() |>
+  select(split = split_x, corpus) |>
+  rbind(dat.all() |> select(split = split_y, corpus))
+
+all_split_pairs |>
+  ggplot(aes(
+    x = substr(split, 2, 2),
+    y = substr(split, 1, 1),
+    fill = after_stat(count) / max(count)
+  )) +
+  geom_bin2d() +
+  geom_bin2d(data = transform(all_split_pairs, corpus="total")) +
+  coord_fixed() +
+  scale_y_discrete(limits = rev(letters)) +
+  scale_fill_continuous(type = "viridis") +
+  facet_wrap(~corpus, ncol = 2) +
+  labs() +
+  theme(
+    legend.position = "bottom"
+  )
+
+  
+```
+
+```{r}
+## alluvial flow diagram going into and out of splits?
+library(ggalluvial)
+
+dat.all() |>
+  select(word = x, split = split_x, start, end, corpus) |>
+  rbind(dat.all() |>
+    select(word = y, split = split_y, start, end, corpus)
+  ) |>
+  distinct() |>
+  mutate(
+    l_boundary = substr(word, start - 1, start - 1),
+    r_boundary = substr(word, end + 1, end + 1),
+    split_l = substr(split, 1, 1),
+    split_r = substr(split, 2, 2)
+  ) |>
+  count(l_boundary, split_l, split_r, r_boundary) |>
+  ggplot(aes(
+    axis1 = l_boundary,
+    axis2 = split_l,
+    axis3 = split_r,
+    axis4 = r_boundary,
+    y = n,
+    alpha = .2
+  )) +
+  scale_x_discrete(limits = c("Left boundary", "First split character", "Second split character", "Right boundary")) +
+  geom_alluvium(curve_type = "sigmoid") +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum)))
+```
+
+```{r}
+# Can I do something similar without ggalluvial?
+
+dat.all() |>
+  select(word = x, split = split_x, start, end, corpus) |>
+  rbind(dat.all() |>
+    select(word = y, split = split_y, start, end, corpus)
+  ) |>
+  distinct() |>
+  slice_sample(prop = .01) |>
+  mutate(
+    l_boundary = substr(word, start - 1, start - 1),
+    split_l = substr(split, 1, 1),
+    split_r = substr(split, 2, 2),
+    r_boundary = substr(word, end + 1, end + 1)
+  ) |>
+  add_count(l_boundary, split_l, split_r, r_boundary) |>
+  ggplot(aes(
+    x = 0,
+    xend = 1,
+    y = match(l_boundary, letters) |> replace_na(27),
+    yend = match(split_l, letters),
+    color = corpus,
+    size = n / (2 * max(n))
+  )) +
+  geom_segment(alpha = 0.2)
 ```
 
 ```{r}
@@ -240,33 +363,34 @@ splits_by_type |>
   filter(common_last %in% c("a", "e", "i", "o", "u")) |>
   count(common_last, split_x, split_y, type) |>
   arrange(desc(n)) #|> View()
-  # once scrolling past the domination of i, some interesting effects,
-  # esp with vowels that can double (oo, ee) -- Great Vowel Shift spellings?
+# once scrolling past the domination of i, some interesting effects,
+# esp with vowels that can double (oo, ee) -- Great Vowel Shift spellings?
 
-  splits_by_type |>
+splits_by_type |>
   filter(substr(x, start - 1, start - 1) == "o" &
-        (substr(split_x, 1, 1) == "o" |
-         substr(split_y, 1, 1) == "o"))# |> View()
-  # as expected, many splits with "o_" have /u/ represented by the <oo>, but
-  # some are even tricker due to other consonant interactions (floor/flown)
+    (substr(split_x, 1, 1) == "o" |
+      substr(split_y, 1, 1) == "o")) # |> View()
+# as expected, many splits with "o_" have /u/ represented by the <oo>, but
+# some are even tricker due to other consonant interactions (floor/flown)
 
-  splits_by_type |>
+splits_by_type |>
   mutate(
     common_last = substr(x, start - 1, start - 1),
     split_x_first = substr(split_x, 1, 1),
     split_y_first = substr(split_y, 1, 1)
   ) |>
   filter(common_last %in% c("o", "e") &
-        (common_last == split_x_first | common_last == split_y_first)) |>
+    (common_last == split_x_first | common_last == split_y_first)) |>
   filter(!if_else(
     common_last == split_x_first,
     split_y_first,
     split_x_first
-  ) %in% c("a", "e", "i", "o", "u")) |> View()
+  ) %in% c("a", "e", "i", "o", "u")) |>
+  View()
 
-  # Also introducing some neat schwa/lenition effects:
-  # "belay/beefy", etc.
-  # time to generalize this
+# Also introducing some neat schwa/lenition effects:
+# "belay/beefy", etc.
+# time to generalize this
 ```
 
 ```{r}
@@ -276,14 +400,16 @@ splits_by_type |>
 # are those specified.
 withLeftBoundary <- function(data, last_common_letters, first_split_letters) {
   data |>
-  mutate(
-    common_last = substr(x, start - 1, start - 1),
-    split_x_first = substr(split_x, 1, 1),
-    split_y_first = substr(split_y, 1, 1)
-  ) |>
-  rowwise() |>
-  filter(common_last %in% last_common_letters &
-         length(intersect(c(split_x_first, split_y_first),
-         first_split_letters)) > 0)
+    mutate(
+      common_last = substr(x, start - 1, start - 1),
+      split_x_first = substr(split_x, 1, 1),
+      split_y_first = substr(split_y, 1, 1)
+    ) |>
+    rowwise() |>
+    filter(common_last %in% last_common_letters &
+      length(intersect(
+        c(split_x_first, split_y_first),
+        first_split_letters
+      )) > 0)
 }
 ```
