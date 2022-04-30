@@ -4,7 +4,7 @@
 # lowercase letters), then find all pairs of valid words that create Split Decisions,
 # i.e., pairs of equal length which differ by exactly two consecutive characters.
 # Authors: Oliver Daniel
-# Date: TODO
+# Date: 2022-04-30
 # Contact: via Quercus or email
 # License: WTFPL
 # Prerequisites:

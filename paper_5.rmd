@@ -24,6 +24,17 @@ geometry: "margin=1.5in"
 bibliography: in/references.bib
 link-citations: true
 ---
+<!-- PREAMBLE
+# Purpose: Create all data analyses, tables, and visualizations required for the final paper of INF 312.
+# Author: Oliver Daniel
+# Data: 2022-04-30
+# Contact: through Quercus
+# License: WTFPL
+# Pre-requisites: 
+# - A reasonably modern R installation, and all data found in the `in/` directory of this repository. All other dependencies should auto-install on run.
+# - knitr
+ -->
+
 \par \textbf{Keywords}: crosswords, split decisions, computational linguistics
 
 Code available on [GitHub (link)](https://github.com/oliver-daniel/inf_313_final_paper).
@@ -238,7 +249,6 @@ In certain context-specific scenarios, other variables are computed:
 
 9. `type`: divides each word pair into one of three categories, depending on the positioning of its split pair. If the split pair is at the beginning of the word, the type is "prefix"; if at the end, "suffix"; and otherwise, "middle". (PL/GR)EASE is a "prefix"-type pair, for example.
 10. `rank`: when comparing different pairs, splits, etc. by their frequency, a ranking variable is introduced to keep track of which is the most frequent, the second most frequent, and so on.
-<!-- TODO -->
 
 Figure \ref{fig:split-violins}, below, demonstrates the distribution of these different split types across word pairs of different corpora and lengths. For example, 15-letter word pairs from the `linux` corpus (in green) overwhelmingly favour suffix-type splits.
 ```{r split-violins, fig.cap="\\label{fig:split-violins}Width at a particular y-value represents the density of splits in word pairs of a given length, starting at that index."}
@@ -588,7 +598,6 @@ dat.all() |>
 
 \newpage
 ## Appendix
-<!-- TODO: python script -->
 ### Link to Python preprocessing script
 Found in the [GitHub repo (link)](https://github.com/oliver-daniel/inf_313_final_paper/blob/main/scripts/find_pairs.py).
 

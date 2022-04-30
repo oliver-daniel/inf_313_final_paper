@@ -1,6 +1,16 @@
+<!-- PREAMBLE
+# Purpose: Explorations and proto-visualizations of data for the final paper of INF 312.
+# Author: Oliver Daniel
+# Data: 2022-04-30
+# Contact: through Quercus
+# License: WTFPL
+# Pre-requisites: 
+# - A reasonably modern R installation, and all data found in the `in/` directory of this repository.
+# - tidyverse
+ -->
+
 ```{r}
 library(tidyverse)
-library(stringdist)
 ```
 
 ```{r}
@@ -296,7 +306,7 @@ dat.all() |>
     alpha = (n / max(n) - .1)^3 + 0.2
   )) +
   geom_segment() +
-  scale_y_continuous(limits = c(rev(letters), "[prefix]"),
+  scale_y_discrete(breaks = c(rev(letters), "[prefix]"),
     sec.axis = sec_axis(~ .)
   )
 ```

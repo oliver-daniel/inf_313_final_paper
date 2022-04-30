@@ -1,6 +1,15 @@
+<!-- PREAMBLE
+# Purpose: Earliest explorations of data.
+# Data: 2022-04-30
+# Contact: through Quercus
+# License: WTFPL
+# Pre-requisites: 
+# - A reasonably modern R installation, and all data found in the `in/` directory of this repository.
+# - tidyverse
+ -->
+
 ```{r}
 library(tidyverse)
-library(stringdist)
 ```
 
 
