@@ -5,7 +5,7 @@ thanks: >
 subtitle: "A cross-sectional analysis of English word pairs that satisfy the properties of the Split Decisions word puzzle"
 author: "Oliver Daniel"
 abstract: >
-  From three English wordlist corpora, pairs of words are generated which might appear in the Split Decisions word puzzle as published by the New York Times, i.e., at least 5 characters in length and differing by exactly two consecutive characters. The corpora are contrasted among themselves, and then the lexical and phonological properties of those words which form pairs – and those which do not – are analyzed for causative insights. Such insights will be alluded to here once discovered.
+  From three English wordlist corpora, pairs of words are generated which might appear in the Split Decisions word puzzle as published by the New York Times, i.e., at least 5 characters in length and differing by exactly two consecutive characters. Even in absence of usage-related data, several ortho-phonotactic trends emerge that puzzle creators can employ to granularly increase or decrease the difficulty of guessing such a pair of words. Also discussed are morpheme and syllable boundaries, and how alterations of these boundaries within a word pair can make mentally recalling one given the other more difficult.
 date: "April 30, 2022"
 output:
   bookdown::pdf_document2:
@@ -30,7 +30,8 @@ Code available on [GitHub (link)](https://github.com/oliver-daniel/inf_313_final
 ```{r setup, echo=FALSE}
 knitr::opts_chunk$set(
     echo = FALSE, warning = FALSE, cache = TRUE,
-    out.width = "100%", out.align = "center", dir
+    out.width = "100%", out.align = "center",
+    fig.align = "center", dir
 )
 options(knitr.graphics.error = FALSE)
 ```
@@ -51,7 +52,8 @@ library(kableExtra) # TODO CITE
 \tableofcontents
 
 ## Introduction
-<!-- TODO: "in this paper..." -->
+This paper analyzes pairs of words, specifically those bearing between them a particular orthographic property described below, as used in a crossword-like puzzle. In particular, we are interested in what factors of these words may make correctly guessing an arbitrary pair more or less difficult, given only a few letters of each. Although many words would be ostensibly ineligible for said puzzle for a number of reasons, especially those sourced from more extensive English lexicons, strong trends emerge from merely analyzing distributions of the characters that make up these word pairs. A combination of the grammatical, orthographic, and phonological systems which underlie spoken and written English converge within these trends, allowing our research to attempt to identify which of these systems might aid or hinder a solver's deduction process. We also identify multiple avenues for future study, in particular by psycholinguists who are interested in the mental connection between written English words and their pronunciations.
+
 ### About Split Decisions
 A few times a year, the New York Times games department releases a new issue of a word puzzle called Split Decisions. Similar to crosswords, the game board consists of boxes arranged in sequence, one for each letter of a word running either left-to-right or top-to-bottom, intersecting with other words at right angles, as shown below in Figure \ref{fig:example-puzzle}. The Split Decisions website [@split-decisions] attributes the original puzzle format to the late George Bredehorn; after his death, the mantle was taken up by Fred Piscop, whose puzzles appear in the *Times* to this day.
 ```{r example-puzzle, out.width="60%", fig.cap="\\label{fig:example-puzzle}An example Split Decisions puzzle from Piscop's website."}
@@ -287,11 +289,12 @@ corpus_2grams |>
 ```
 
 ## Results
-Upon encountering such a wide distribution of categorical data (i.e., ordered strings of characters), our first thought was to see if some aspect of the distribution obeyed Zipf's Law [@zipf]. In brief, this empirical law states that when observations in a categorical set are ranked by frequency, the second-ranked observation occurs roughly half as often as the first, the third-ranked a third as often, and so on. In mathematical terms, over a frequency-ordered distribution $X$ with ranking variable $i$,
+### 1- and 2-grams vs. Zipf's Law
+Upon encountering such a wide distribution of categorical data (i.e., ordered strings of characters), our first thought was to see if some aspect of the distribution obeyed **Zipf's Law** [@zipf]. In brief, this empirical law states that when observations in a categorical set are ranked by frequency, the second-ranked observation occurs roughly half as often as the first, the third-ranked a third as often, and so on. In mathematical terms, over a frequency-ordered distribution $X$ with ranking variable $i$,
 
 $$\text{Zipf}(X) \iff X_i \approx \frac{X_1}{i}.$$
 
-```{r letter_distributions}
+```{r letter-distributions}
 make_letter_dist <- function(corpus) {
   read.table(paste0("in/corpus/", corpus, ".txt")) |>
     tibble() |>
@@ -316,9 +319,15 @@ letter_rankings <- letter_dists |>
   pivot_wider(names_from = corpus) |>
   mutate(total = rowSums(across(2:4))) |>
   arrange(desc(total))
+
+letter_error <- letter_rankings |>
+  mutate(
+      expected = max(total) / match(name, letter_rankings$name),
+      error = abs(total - expected) / expected * 100
+  )
 ```
 
-Before examining the splits and other puzzle-specific properties of words, we examined the distribution of one- and two-letter sequences to see if any Zipf-like patterns emerged. Surprisingly, however, the data outperformed Zipf's Law (i.e., contained many more observations than the power law predicts) in these categories. Figure \ref{fig:single-letter-distribution} below, which examines the total occurrences of single letters in all valid words, exemplifies this. The black dashed curve represents the expected count of each letter according to Zipf's Law, whereas the total height of each bar represents the actual count. The second-most common letter, *s*, is expected to occur $539,056 / 2 = 269,528$ times, or 50% of the total occurrences of *e*; it instead appears roughly 84% as often, a total of `r letter_rankings$total[[2]]` times. This disparity between Zipfian expectation and reality only increases in higher ranks, save for the universally rare *q* and *j*.
+Before examining the splits and other puzzle-specific properties of words, we examined the distribution of one- and two-letter sequences, herefore *1-grams* and *2-grams*, respectively, to see if any Zipf-like patterns emerged. Surprisingly, however, the data outperformed Zipf's Law (i.e., contained many more observations than the power law predicts) in these categories. Figure \ref{fig:single-letter-distribution} below, which examines the total occurrences of each letter in all valid words, exemplifies this. The black dashed curve represents the expected count of each letter according to Zipf's Law, whereas the total height of each bar represents the actual count. As an example, the second-most common letter, *s*, is expected to occur $539,056 / 2 = 269,528$ times, or 50% of the total occurrences of *e*. In the data, it instead appears roughly 84% as often, a total of `r letter_rankings$total[[2]] |> format(big.mark = ",")` times. This disparity between Zipfian expectation and reality only increases in higher ranks, including the universally rare *q* and *j*, with a mean percent error of `r mean(letter_error$error) |> format(nsmall = 3)`% across all 26 letters.
 
 ```{r single-letter-distribution, fig.cap="\\label{fig:single-letter-distribution}The total distribution of letters across all valid corpus words is consistently greater than the ideal Zipf curve (black) would predict."}
 
@@ -370,8 +379,13 @@ corpus_2grams |>
   theme()
 ```
 
+As can be observed, all three corpora (points) have an overlarge 'head' to their distributions compared to the Zipf ideal (dashed lines), but only up to a certain point. At or about rank 420, the Zipf curves of each corpus intersect with their respective observed distributions. This is indicated by the vertical dotted line on Figure \ref{fig:two-letter-distribution}. From there, this 'tail' of the curve begins to *underperform* Zipf, with all 2-grams less frequent than rank 420 appearing considerably less often than predicted.
 
+Note that the plot is log-scaled along the *y*-axis; to the eye, the observed distribution appears almost linear between ranks 100 and 400. It would appear, then, that frequency experiences a *logarithmic* correlation to rank, rather than the power law demanded by Zipf. Outside of these boundaries, however, frequency drops sharply with rank, indicating a greater disparity in frequency among 2-grams in these ranges.
 
+### Split pairs
+#### Split distributions
+We now examine the properties of a very particular sort of 2-gram: split pairs. Given that a difference in these substrings is sufficient to differentiate at least two words, it follows that more common splits (i.e., either half of a split pair) would serve as divisors among a greater variety of corpus words. Figure \ref{fig:split-letters-heatmap} below is read by choosing the first letter in the split by row, then concatenating it to the letter value of the column. Looking at the heatmap labelled `total` in the bottom-right corner, we see a small handful of high-frequency pairs, shown in yellow: "er", "in", "ng", "re", "st". Curiously, the only letters to combine with all others, in either the first or second position, are the orthographic vowels *a*, *e*, *i*, *o*, and *u*. Individual corpora may have one or more cells missing, but all the corpora combined account for every combination. Likewise, letters like *x* only attach as the second split letter to vowels, this time also including the semivowel *y*.
 ```{r split-letters-heatmap, fig.cap="\\label{fig:split-letters-heatmap}Split pairs are predominated by a few major players: es, ng, re, st, etc."}
 all_split_pairs <- dat.all() |>
   select(split = split_x, corpus) |>
@@ -398,8 +412,14 @@ all_split_pairs |>
   theme()
 ```
 
+#### Positioning
+Most of the aforementioned high-frequency splits, specifically "er", "ng", "re", and "st", all appear as part of English bound morphemes; that is, units of meaning that can only be used by attaching them to more self-contained concept-words. For example, the word "unlocking" consists of three morphemes: the free morpheme "lock", prefixed by the bound morpheme "un-" and suffixed by "-ing". These bound morphemes, when interpreted in the correct order, transform the utterance's meaning to "the act of removing the status of 'locked' from something". However, we cannot confirm the usage of these substrings in their morphemic sense without first determining where in a given word pair they appear (e.g., STRO(NG/KE)).
+
+We annotate every split by assorting them into one of three positional values. If the split occurs at the beginning of the word, as in (BA/CO)RN, both BA and CO are registered as two instances of a *prefix*-type split; if at the end, as in "FO(ND/XY)", as *suffix*-type splits; and as *middle*-type splits otherwise. Table \ref{tab:top-splits-by-position} below depicts the 10 most-frequent splits at each position, across all corpora.
+
+Many of the top splits in the prefix and suffix columns correspond to common English bound morphemes, which may explain their frequency: given some other word as a free morpheme, prepending or appending these splits (potentially along with extra common letters) can often create a new word with a modified meaning. Of particular significance are the "ng" and "on" splits, which Table \ref{tab:corpus-stats} notes is the most common pair across all three corpora. Prefixed with a verb and an "i", these two suffixes decline the verb into a gerund and a noun, respectively: e.g., "activati**on**", "activati**ng**". Since many verbs are able to take on both of these forms using these suffixes, the frequency of the splits (especially as a pair) is tied directly to the number of verbs in a corpus. Similarly, suffixes like "-er" and "-st" are often found in comparative and superlative adjectival phrases ("funni**er**", "funnie**st**"). Although transformations like these differ in resultant length and thus cannot form pairs with each other, each can attach to many adjective stems and pair with a wider breadth of other words, whether other declensions of the same stem, e.g., funni(er/ly), or the same declension of a different stem, e.g., fu(nn/zz)iest. In effect, each highly-productive[^4] bound morpheme serves as something as a multiplier on the distributional effects of different parts of speech.
 ```{r top-splits-by-position}
-splits_by_type <- dat.all() |>
+splits_by_type.r <- dat.all() |>
   mutate(
     type = case_when(
       start == 1 ~ "prefix",
@@ -408,30 +428,41 @@ splits_by_type <- dat.all() |>
     )
   )
 
-rbind(
-  splits_by_type |> select(split = split_x, type),
-  splits_by_type |> select(split = split_y, type)
-) |>
+splits_by_type <- rbind(
+  splits_by_type.r |> select(split = split_x, type),
+  splits_by_type.r |> select(split = split_y, type)
+)
+
+split_type_count <- function(type_) {
+    splits_by_type |>
+    count(type) |>
+    filter(type == type_) |>
+    pull("n")
+}
+
+splits_by_type |>
   count(split, type, sort = T) |>
   group_by(type) |>
-  do(head(., 5)) |>
-  mutate(str_rep = paste0(split, " (", n, ")"), id = row_number()) |>
+  do(head(., 10)) |>
+  mutate(
+      str_rep = paste0(split, " (", n, ")"), id = row_number()) |>
   pivot_wider(names_from = type, values_from = str_rep) |>
   group_by(id) |>
   summarise_all(~ na.omit(.)[1]) |>
   select(id, prefix, middle, suffix) |>
   kable(booktabs = F, col.names = c(
-      "Rank", "prefix", "middle", "suffix"
+      "Rank",
+      map(c("prefix", "middle", "suffix"),
+      ~ paste0(., " (", split_type_count(.), " total)"))
   ), caption = "Most common splits by word position.") |>
   kable_classic(latex_options = "hold_position")
 ```
 
-```{r split-position-distribution, }
+Again comparing the frequency distributions of splits, this time by position type instead of by corpus, against Zipf's Law yields another logarithmic correlation (note the log-scale in Figure \ref{fig:split-position-distribution}). That is, the observed distribution overperforms compared to the Zipf model before a particular inflection point, after which it begins to underperform with increasing error. Here, sheer combinatorics produces something of a visual confounding effect: middle splits outnumber both prefixes and suffixes by an order of magnitude, and encompass almost two hundred more 2-grams. As a result, we do not observe the same *x*-intercept as in Figure \ref{fig:two-letter-distribtion}, in which all three distributions seem to intersect their ideal Zipf curves (dashed lines) at the same rank. We again observe that prefixes and suffixes have this intersection at roughly the same point, around rank 255, but the middle-type splits have their inflection point around rank 445. By drawing dotted lines at the intersections of these distributions with the Zipf model, we see that the two intersections occur approximately 190 ranks apart and in both cases separate roughly 100 of the least frequent splits into a 'tail' of sorts.
 
-rbind(
-  splits_by_type |> select(split = split_x, type),
-  splits_by_type |> select(split = split_y, type)
-) |>
+```{r split-position-distribution, fig.cap="\\label{fig:split-position-distribution}After the high-performing morphemes at the top of the rankings, frequency appears to fall logarithmically with rank."}
+
+splits_by_type |>
   count(split, type) |>
   group_by(type) |>
   mutate(
@@ -443,22 +474,117 @@ rbind(
   geom_point() +
   geom_line(aes(x = rank, y = f), linetype = 2) +
   geom_text(vjust = -1.5, hjust = .5, size = 3) +
+  geom_vline(aes(xintercept = 255), linetype = 3) +
+  geom_vline(aes(xintercept = 445), linetype = 3) +
   # geom_smooth(method = "lm", se = F, alpha = .5) +
   scale_x_continuous(limits = c(1, 26^2)) +
   scale_y_log10() +
   labs(
-      title = str_wrap("Distribution of splits by word position", 60),
+      title = str_wrap("Distribution of splits by word position vs. Zipf's Law", 60),
       y = "Occurrences (log-scale)",
       x = "Frequency rank"
   )
 ```
 
+
 ## Discussion
+When discussing the data and observations covered in this paper, it is important to remember that our corpora only possess enough data to suggest the *existence* of a word, and speak nothing to its usage. Even though we used the Split Decisions game as a jumping-off point for our examination, a plurality of these words would be ineligible in such a puzzle not due to the properties of its letters, but because of its guessability and fun. Many words, in particular those that appear in the Scrabble wordlists, are esoteric in the extreme and would likely be considered too rare to be reasonably guessed by the average crossword player. Or, a word pair could contain an extremely vulgar or offensive phrase. Or – and this is likely the greatest disqualifier – the split pair would be too generic, and too many words of the correct length could feasibly serve as fill. For example, 1,084 word pairs across the three corpora are seven-letter words ending in a ER/NG split: baggier/bagging, bulkier/bulking, tastier/tasting... With limited possibility for cluing available on the puzzle page, these clues would not be entertaining to solve, eliminating a large proportion of our vocabulary from real-life use.
+
+That being said, our exploration does lay groundwork for a future study, one better-equipped to handle the quantitative aspects of written and spoken English, in what sort of psycholinguistic models are used to guess pairs of words based on Split Decisions-style cluing. Through insights acquired both through writing this paper and through experience of playing Split Decisions puzzles, a few major constraint systems that transparently underly English speech and orthography, as well as some transformative ortho-phonological effects that can affect one side of a split pair, but not the other.
+
+Instruction of all following linguistic theories and axioms is accredited to the University of Toronto Department of Linguistics c.2018–2020. Teaching staff include but are not limited to: Marisa Brook, Susana Béjar, Keir Moulton, Nathan Sanders, Guillaume Thomas, and Peter Jurgec.
+
 ### Orthotactics
+Like all writing systems, written English is underlain by a complex system of rules and heuristics that, in part, dictates its aesthetic. To best understand these systems, it is often useful to encounter an example that violates these rules, and then to interrogate one's reactions to the failure as a native speaker. Take, for example, the Welsh loanword *cwtch*, meaning something small and intimate. To the anglophone eye, *cwtch* simply "looks wrong", for any number of articulable reasons. One such reason may be the absence of one of the "aeiou" sequence English speakers usually associate with vowel sounds. Another could be the substring *cw*, which is extremely uncommon in English orthography and otherwise unattested as the first two letters of a word (or indeed outside of compound words)[^5].
+
+In many cases, being familiar with these English orthography rules, however subtle, can supplement solver's ability to deduce possible words. For example, if a word with the following 'template' appears in a puzzle:
+
+$$ \_\ {EE \choose TR} \_\ \_\ \_$$
+
+There are only select few letters that can reasonably appear as the first letter of the fill, with the remainder being logically eliminated by one or both of the splits. The most likely letter altogether, as a keen reader has likely deduced by now, is *s*; many common English words of similar length begin with "see-" or "str-". Many other letters are quickly eliminated: the first letter is unlikely to be a vowel, as three-vowel sequences at the beginning of words is rare.[^6] Other continuant consonants, like *f*, *z*, *h*, or *r*, conflict instead with the TR split and are thus incompatible, despite no string of letters being ostensibly impossible to write. Conversely, we observe that the first letter at the right boundary of the fill *must* be a vowel: assuming that the first letter is *s*, the consonant cluster *str* is as long as either written or spoken English will allow at the beginning of a syllable. But, the vowel must not be *e* to avoid an *eee* substring... This deduction, powered entirely by one's intuition about English spelling, continues until a solution is found, most likely (SEEING, STRING). Take inventory of which of these propositions you found yourself inherently agreeing with, even in absence of some objective reference for which substrings are or are not attested in English words.
+
+This sort of constraint-based reasoning about spelling is generally referred to as *orthotactics*. In general, having a solid understanding of English orthotactics benefits the solver of a Split Decisions puzzle, as it helps reduce uncertainty about missing letters. This effect compounds with the crossword-like nature of the puzzle: as each word pair is solved, it also introduces letters into one or more crossing pairs, which further propagates constraints in the fill.
+
+However, to introduce greater variety and complexity, puzzle setters can also rely on special categories of words whose properties allow them to violate these orthotactic rules more frequently. One of these categories is loanwords like the aforementioned *cwtch* (from Welsh) or *bazaar* (from Persian), both of which visibly violate English's rules about vowel count. This is especially true of loanwords from other languages that use the Latin alphabet: French, Italian, Finnish, etc. Latin-scripted words are more likely to be taken wholesale without modification, whereas the transfer from another writing system into English often affords opportunity for ortho-phonological repair which reifies the spelling and pronunciation of a word to something more normatively English. Another such category would be compound words, which contain more than one free morpheme concatenated together. A common word pair, found in several of @split-decisions\'s puzzles, is B(AR/ED)ROOM, consisting of two compound words that describe rooms of a house by their contents. Morpheme boundaries can also cause categorical ambiguity for solvers by pairing words that differ in the transparency of their compounding: although most English speakers readily identify PREWAR as consisting of two morphemes – *pre-*, meaning 'before', and *war* – but less readily recognize the same *pre-* morpheme in the function word PREFER[^7]. As a result, the PRE(FE/WA)R pair provides a novel dimension of challenge to new solvers.
+
+Our results showed that bound morphemes, especially suffixes like *-er* and *-ing*, were predominantly frequent across all three corpora. As previously mentioned, a great many of these declensions produce pairings that are not particularly novel to solve, e.g., SCARI(ER/NG). However, we can again see that combinations of words in which said suffix functions differently in each can create challenging fills, specifically by forcing solvers to consider the clued substring both in its grammatical and non-grammatical context. An example was provided at the beginning of this section in S(EE/TR)ING: the -ING suffix simultaneously functions in its common gerund form (in SEEING) and as a simple segment of a non-verb word (STRING).
 
 ### Phonotactics
+Similar to the orthotactics of written language, spoken or signed languages also operate under a matrix of rules and constraints known as *phonotactics*, which defines what sorts of utterances are permissible as potential words. This concept is explored in Andrew Clement's 1998 children's novel *Frindle*, in which a young boy rises to celebrity by coining the titular term as a novel synonym for "pen". Indeed, *frindle* appears to be both ortho- and phonotactically felicitous to English speakers, with any markedness (i.e., speaker hesitance) being brought about primarily by a lack of previous attestation for the word. A facetious term for this phenomenon, coined by David Cohen of *The Simpsons*, is *cromulent*: "*embiggens* is a perfectly cromulent word!" Indeed, the word "cromulent" is so cromulent that, despite appearing only once on the animated sitcom, native English speakers are usually able to readily understand what is meant by the declined form *cromulence* (i.e., the status of being cromulent).
 
-### 
+Note that, in writing systems like that of English, where the written form of a word at least partly attempts to reflect its pronunciation, there is a strong interaction between the phonotactics of the spoken language and the orthotactics of its written variant; we have referred to this interaction as *ortho-phonotactics* at varying points through this paper. Ortho-phonotactic repair is frequently seen when adapting loanwords from languages that use phonemes or other linguistic features unfamiliar to English: consider the breadth of pronunciations and spellings of the holiday *Hannukkah*.
+
+As previously mentioned, there is nothing inherently unpronounceable about many complex clusters of consonants like, say, /tln/. Instead, this notion of pronounceability is largely defined by the languages one speaks, and thus varies widely among speakers. For the purposes of an English-language puzzle, however, taking advantage of these expectations – what sorts of substrings are expected to appear in a word and where – allows puzzle setters to wield a surprisingly granular amount of control over the difficulty of a puzzle. For example, the split ZJ is exceedingly rare as a 2-gram, causing most English speakers to readily identify it as indicating either a phoneme from a loanword or the nexus of a compound word. Indeed, the 2-gram appears in exactly one word in both the `collins` and `nwl` corpora: BIZJET, a shortened form of "business jet(plane)". Conversely, cluing a common 2-gram that usually appears as a cluster, but instead the two letters are separated by a morpheme boundary, can increase the guessing of difficulty by forcing solvers to consider the two letter-sounds separately. Example: FATHE(RS/AD). Notice how in one side of the split, the TH 2-gram represents the usual dental fricative sound, but in the other, it represents a /t/ and an /h/ separately.
+
+### Local phonological interactions
+No phoneme is an island. Its articulation (i.e., exactly how it is pronounced out of a speaker's mouth) is directly impacted by its phonological context, and in turn that phoneme's presence affects the phonological context around it. Consider the difference in pronunciation of the final consonants in *booth* vs. *booths*. Although even very young children readily identify that the plural *-s* is pronounced /z/ when the preceding phoneme is voiced, and /s/ otherwise [@gleason2019wug], the final consonant in *booth* is unvoiced unless the word is pluralized, in which case both the dental fricative (the 'th') and the /s/ change to their voiced variants. This phenomenon of two adjacent phonemes interacting with each other, with one or both mutating as a result, is generally referred to as a *local phonological interaction*. Although these interactions are not as marked in English as, say, the vowel harmony system of the Uralic languages, their presence serves as another ortho-phonological avenue for controlling the guessability of word pairs. In terms of local interactions, we use the terms of art *regressive* and *progressive* to refer to interactions affecting preceding and succeeding phonemes, respectively.
+
+One such regressive interaction in English is vowel nasalization: when a vowel either directly precedes or directly follows a nasal consonant, one of /n/, /m/, or /ŋ/[^8], it is articulated with a retracted velum, allowing airflow through the nasal passage. This is why, for example, the words *bat* and *ban* do not slant-rhyme (share a common vowel sound). A similar regressive interaction happens before /r/, called *r-coloring*, which can significantly alter the pronunciation of a vowel (*bun*, *burn*). Regressive interactions can induce a great deal of difficulty at the left boundary of a split pair, by differentiating the pronunciation of a preceding vowel between the two sides. Consider, for example, the pair PRESE(NT/RV)ED, in particular the difference in pronunciation of the left-boundary *E*.
+
+Figure \ref{fig:left-boundaries} below depicts left boundaries: that is, the transition between the last letter of the common substring before a split, and the first letters of said split. For visual clarity, only those boundaries that occur more than 400 times are shown, and some of the more dominant declension suffixes have been removed. The thickness and opacity of lines is proportional to their frequency. Along the left edge, it can be seen that most common left boundaries start with a vowel, but the respective first letter of the split varies widely. However, a few major outliers can be seen. One is the connection between *i* and *e*; others stem from *o* to *o*, *u*, or *w*. Although less visible among other nearby letters, *n* receives many of these vowels from the left boundary. 
+
+Although, again, our corpora have not been curated for what sorts of words might be more viable in a real Split Decisions puzzle, these points tell an interesting narrative of ortho-phonological interaction. Indeed, consider the following sets of words:
+
+* piece, piety, lies, lien
+* poor, blood, foot, loon
+* pour, lout, would, through, cough, counter
+* bowl, cowl, town
+
+Despite sharing the same two-vowel substrings, each of these words' phonetic vowels are articulated differently. Even for the last word in each set, which differs by its syllable-final nasal (here *n*), the vowel or diphthong is articulated subtly differently owing to the aforementioned nasalization effect. In short, a large set of common words share these common bivocalic left boundaries, but vary widely in their pronunciation. A future study may be interested in how this psychoacoustic difference between similarly-spelled words may affect the priming time of recalling these two words as a pair, and subsequently deducing that they serve as the unambiguous solution for a given Split Decisions puzzle. Such an analysis would also be interested in, for example, the usage frequency and commonality of different words, and perhaps would also employ lemmatization algorithms to differentiate functional vs. non-functional suffixes more directly.
+
+```{r left-boundaries, fig.cap="\\label{fig:left-boundaries}Even excluding some of the most common declension suffixes, vowels are extremely common on both sides of a left split boundary."}
+min_occurrences <- 400
+
+dat.all() |>
+  select(word = x, split = split_x, start, end, corpus) |>
+  rbind(dat.all() |>
+    select(word = y, split = split_y, start, end, corpus)
+  ) |>
+  filter(!str_detect(word, "(ings?)|(ions?)|(iers?)$")) |>
+  mutate(
+    l_boundary = substr(word, start - 1, start - 1),
+    split_l = substr(split, 1, 1),
+    split_r = substr(split, 2, 2),
+    r_boundary = substr(word, end + 1, end + 1)
+  ) |>
+  count(l_boundary, split_l, split_r, r_boundary, corpus) |>
+  filter(n >= min_occurrences) |>
+  ggplot(aes(
+    x = 0,
+    xend = 1,
+    y = match(l_boundary, rev(letters)) |> replace_na(27),
+    yend = match(split_l, rev(letters)),
+    color = corpus,
+    size = n / (max(n)^2),
+    alpha = (n / max(n) - .1)^3 + 0.2
+  )) +
+  geom_segment() +
+  scale_y_continuous(
+    breaks = 1:27,
+    labels = c(rev(letters), "[prefix]"),
+    sec.axis = dup_axis(labels = c(rev(letters), ""))
+  ) +
+  scale_x_continuous(
+    breaks = c(0, 1),
+    labels = c("Left boundary of fill", "First letter of split")
+  ) +
+  labs(
+    title = str_wrap("Flow of left boundaries of Split Decisions fill words into first letters of splits",
+      60),
+  subtitle = paste("(min.", min_occurrences, "occurrences, \"-ing(s)\", \"-ier(s)\", and \"-ion(s)\" suffixes removed)")
+  ) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    legend.position = "bottom"
+  ) +
+  guides(
+    color = "legend",
+    alpha = "none",
+    size = "none"
+  )
+```
 
 \newpage
 ## Appendix
@@ -475,4 +601,9 @@ Found in the [GitHub repo (link)](https://github.com/oliver-daniel/inf_313_final
 <!-- Footnotes -->
 [^1]: Or *fill*: this part of the puzzle is filled in by the player rather than the constructor.
 [^2]: i.e., any naive iterative algorithm.
-[^3]: Pertaining to the rules and constraints of spelling. E.g., "pwn" violates English orthotactic rules, and thus could never constitute a non-abbreviated English word.
+[^3]: Pertaining to the rules and constraints of spelling. E.g., "pnt" violates English orthotactic rules, and thus could never constitute a non-abbreviated English word.
+[^4]: Meaning that the morpheme attaches readily to a broad number of words. Conversely, the plural suffix "-ren" (as in "children") would be a low-productive morpheme.
+[^5]: Other words containing *cw* in Collins and NWL include: *colicweed(s)*, *cwtches*, *cwtching*. *cwtched*, *rusticwork(s)*, *plasticware(s)*.
+[^6]: Examples: *aeons*, *aeolian*, *aioli*, *ouija*, *oeuvre*.
+[^7]: [Etymology Online (link)](https://www.etymonline.com/word/prefer#etymonline_v_19403): from Latinate *pre-* and a Proto-Indo-European (PIE) root which arrived in English as *bear* (i.e., to carry); roughly "to choose to bear first".
+[^8]: The velar nasal; appears at the end of "hang" or "thinking".
